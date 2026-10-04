@@ -20,4 +20,13 @@ describe('local workspace repository', () => {
     const repository = new LocalWorkspaceRepository(memoryStorage('{broken'))
     await expect(repository.load()).resolves.toBeNull()
   })
+
+  it('normalizes legacy plans that have no annotations field', async () => {
+    const document = createInitialDocument()
+    const legacy = JSON.parse(JSON.stringify(document)) as { plans: { annotations?: unknown }[] }
+    delete legacy.plans[0].annotations
+    const repository = new LocalWorkspaceRepository(memoryStorage(JSON.stringify(legacy)))
+    const loaded = await repository.load()
+    expect(loaded?.plans[0].annotations).toEqual([])
+  })
 })

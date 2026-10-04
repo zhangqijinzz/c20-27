@@ -1,22 +1,27 @@
-import { AlertTriangle, Crosshair, RotateCcw, RotateCw, Ruler, Trash2 } from 'lucide-react'
-import type { DeskItem, WorkspacePlan } from '../../../shared/models'
+import { AlertTriangle, Crosshair, MessageSquarePlus, RotateCcw, RotateCw, Ruler, Trash2 } from 'lucide-react'
+import type { DeskItem, PlanAnnotation, WorkspacePlan } from '../../../shared/models'
 import { getDeviceDefinition } from '../../../shared/models'
+import { AnnotationEditor } from '../../annotations/components/AnnotationEditor'
 
 interface InspectorPanelProps {
   plan: WorkspacePlan
   item: DeskItem | null
+  annotation: PlanAnnotation | null
   issueIds: string[]
   onUpdateDesk: (field: 'deskWidthMm' | 'deskHeightMm', value: number) => void
   onUpdateItem: (id: string, patch: Partial<Pick<DeskItem, 'widthMm' | 'heightMm' | 'x' | 'y'>>) => void
   onRotate: (id: string, delta: number) => void
   onDelete: (id: string) => void
+  onAddAnnotationForItem: (itemId: string) => void
+  onUpdateAnnotation: (id: string, patch: Partial<Pick<PlanAnnotation, 'text' | 'color' | 'resolved'>>) => void
+  onRemoveAnnotation: (id: string) => void
 }
 
 function NumericField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
   return <label className="numeric-field"><span>{label}</span><input type="number" value={value} min={40} onChange={(event) => onChange(event.currentTarget.valueAsNumber)} /><em>mm</em></label>
 }
 
-export function InspectorPanel({ plan, item, issueIds, onUpdateDesk, onUpdateItem, onRotate, onDelete }: InspectorPanelProps) {
+export function InspectorPanel({ plan, item, annotation, issueIds, onUpdateDesk, onUpdateItem, onRotate, onDelete, onAddAnnotationForItem, onUpdateAnnotation, onRemoveAnnotation }: InspectorPanelProps) {
   const isIssue = item ? issueIds.includes(item.id) : false
   const definition = item ? getDeviceDefinition(item.type) : null
   return (
@@ -33,7 +38,9 @@ export function InspectorPanel({ plan, item, issueIds, onUpdateDesk, onUpdateIte
         </div>
         <p className="helper-text">建议保留 40 mm 走线缓冲空间</p>
       </div>
-      {item && definition ? (
+      {annotation ? (
+        <AnnotationEditor plan={plan} annotation={annotation} onUpdate={onUpdateAnnotation} onRemove={onRemoveAnnotation} />
+      ) : item && definition ? (
         <div className="item-editor">
           <div className="selected-item-heading"><span className="selected-swatch" style={{ backgroundColor: definition.color }} /> <div><strong>{definition.label}</strong><small>{definition.hint}</small></div><span className="item-code">{definition.shortLabel}</span></div>
           {isIssue && <div className="issue-callout"><AlertTriangle size={16} /><span>设备与其他元素重叠或超出桌面边界</span></div>}
@@ -48,10 +55,11 @@ export function InspectorPanel({ plan, item, issueIds, onUpdateDesk, onUpdateIte
             <NumericField label="Y" value={Math.round(item.y)} onChange={(value) => onUpdateItem(item.id, { y: value })} />
           </div>
           <div className="rotation-row"><span><Crosshair size={15} /> 旋转角度 <strong>{Math.round(item.rotation)}°</strong></span><div className="rotation-actions"><button aria-label="逆时针旋转 15 度" onClick={() => onRotate(item.id, -15)} type="button"><RotateCcw size={15} /></button><button aria-label="顺时针旋转 15 度" onClick={() => onRotate(item.id, 15)} type="button"><RotateCw size={15} /></button></div></div>
+          <button className="annotate-item-button" onClick={() => onAddAnnotationForItem(item.id)} type="button"><MessageSquarePlus size={15} /> 给这个设备加批注</button>
           <button className="remove-item-button" onClick={() => onDelete(item.id)} type="button"><Trash2 size={15} /> 移除这个设备</button>
         </div>
       ) : (
-        <div className="empty-inspector"><span className="empty-illustration">⌖</span><strong>选择一个设备</strong><p>点击画布上的设备查看尺寸、位置和旋转控制。</p></div>
+        <div className="empty-inspector"><span className="empty-illustration">⌖</span><strong>选择一个设备或批注</strong><p>点击画布上的设备查看尺寸、位置和旋转控制；点「钉批注」可以把意见留在图上。</p></div>
       )}
     </aside>
   )

@@ -1,4 +1,5 @@
 import { createInitialDocument, type WorkspaceDocument } from '../../shared/models'
+import { normalizeWorkspaceDocument } from '../annotations/annotationsViewModel'
 import { BrowserStorageService, isWorkspaceDocument, type StorageService } from './storageService'
 
 export interface WorkspaceRepository {
@@ -14,7 +15,7 @@ export class LocalWorkspaceRepository implements WorkspaceRepository {
       const raw = await this.storage.read()
       if (!raw) return null
       const parsed: unknown = JSON.parse(raw)
-      return isWorkspaceDocument(parsed) ? parsed : null
+      return isWorkspaceDocument(parsed) ? normalizeWorkspaceDocument(parsed) : null
     } catch {
       return null
     }

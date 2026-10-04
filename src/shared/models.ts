@@ -12,12 +12,25 @@ export interface DeskItem {
   rotation: number
 }
 
+export interface PlanAnnotation {
+  id: string
+  /** null 表示钉在桌面某个位置（x/y 为绝对坐标）；否则挂在该设备上（x/y 为相对设备左上角的偏移，随设备移动） */
+  targetItemId: string | null
+  x: number
+  y: number
+  text: string
+  color: string
+  resolved: boolean
+  createdAt: string
+}
+
 export interface WorkspacePlan {
   id: string
   name: string
   deskWidthMm: number
   deskHeightMm: number
   items: DeskItem[]
+  annotations: PlanAnnotation[]
   updatedAt: string
 }
 
@@ -63,6 +76,22 @@ export const DEVICE_DEFINITIONS: DeviceDefinition[] = [
 
 export const DEFAULT_DESK = { widthMm: 1600, heightMm: 800 }
 
+export const ANNOTATION_COLORS = ['#f2b84b', '#7fb0f0', '#8fd0a4', '#ef9fc0', '#c3aef2']
+
+export function createAnnotation(partial: Partial<PlanAnnotation> = {}): PlanAnnotation {
+  return {
+    id: createId('note'),
+    targetItemId: null,
+    x: 0,
+    y: 0,
+    text: '',
+    color: ANNOTATION_COLORS[0],
+    resolved: false,
+    createdAt: new Date().toISOString(),
+    ...partial,
+  }
+}
+
 export function getDeviceDefinition(type: DeviceType): DeviceDefinition {
   return DEVICE_DEFINITIONS.find((device) => device.type === type) ?? DEVICE_DEFINITIONS[0]
 }
@@ -102,6 +131,7 @@ export function createPlan(name = '我的工作台', withDemo = true): Workspace
     deskWidthMm: DEFAULT_DESK.widthMm,
     deskHeightMm: DEFAULT_DESK.heightMm,
     items,
+    annotations: [],
     updatedAt: new Date().toISOString(),
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPlan, createItem } from '../../../shared/models'
+import { createPlan, createItem, createAnnotation } from '../../../shared/models'
 import { analyzeLayout, getItemBounds, normalizeRotation } from '../../../shared/layoutRules'
 
 describe('workspace rules', () => {
@@ -30,5 +30,16 @@ describe('workspace rules', () => {
     const analysis = analyzeLayout({ ...plan, items: [first, second] })
     expect(analysis.status).toBe('clear')
     expect(analysis.coveragePercent).toBeGreaterThan(0)
+  })
+})
+
+describe('annotations and layout rules', () => {
+  it('ignores annotations in overlap, bounds and coverage checks', () => {
+    const plan = createPlan('批注', false)
+    const item = { ...createItem('monitor'), x: 100, y: 100 }
+    const note = createAnnotation({ x: 100, y: 100 })
+    const baseline = analyzeLayout({ ...plan, items: [item] })
+    const withNotes = analyzeLayout({ ...plan, items: [item], annotations: [note] })
+    expect(withNotes).toEqual(baseline)
   })
 })
