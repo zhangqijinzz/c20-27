@@ -3,9 +3,12 @@ import {
   createId,
   createInitialDocument,
   createPlan,
+  normalizeDocument,
+  type AnnotationAnchorInput,
   type DeskItem,
   type DeviceType,
   type LayoutAnalysis,
+  type PlanAnnotation,
   type WorkspaceDocument,
   type WorkspacePlan,
   type WorkspaceStatus,
@@ -14,6 +17,15 @@ import { clampDeskSize, clampItemDimension } from '../../shared/layoutRules'
 import { moveCanvasItem, rotateCanvasItem } from '../canvas/canvasViewModel'
 import { createMaterialDraft } from '../materials/materialsViewModel'
 import { inspectPlan } from '../inspection/inspectionViewModel'
+import {
+  addPlanAnnotation,
+  detachAnnotationsOfItem,
+  duplicateAnnotations,
+  movePlanAnnotation,
+  reconcileAnnotations,
+  removePlanAnnotation,
+  updatePlanAnnotation,
+} from '../annotations/annotationViewModel'
 import { LocalWorkspaceRepository, type WorkspaceRepository } from './workspaceRepository'
 
 export interface WorkspaceViewModel {
@@ -26,6 +38,9 @@ export interface WorkspaceViewModel {
   issueCount: number
   feedback: string
   isPreviewOpen: boolean
+  annotationsVisible: boolean
+  pinMode: boolean
+  selectedAnnotationId: string | null
   selectItem: (id: string | null) => void
   addItem: (type: DeviceType) => void
   removeItem: (id: string) => void
@@ -33,6 +48,13 @@ export interface WorkspaceViewModel {
   rotateItem: (id: string, delta: number) => void
   updateItem: (id: string, patch: Partial<Pick<DeskItem, 'widthMm' | 'heightMm' | 'x' | 'y'>>) => void
   updateDesk: (field: 'deskWidthMm' | 'deskHeightMm', value: number) => void
+  addAnnotation: (anchor: AnnotationAnchorInput) => void
+  updateAnnotation: (id: string, patch: Partial<Pick<PlanAnnotation, 'text' | 'color' | 'resolved'>>) => void
+  removeAnnotation: (id: string) => void
+  moveAnnotation: (id: string, x: number, y: number) => void
+  selectAnnotation: (id: string | null) => void
+  setPinMode: (active: boolean) => void
+  toggleAnnotationsVisible: () => void
   createNewPlan: () => void
   duplicatePlan: () => void
   selectPlan: (id: string) => void
@@ -48,6 +70,8 @@ export function useWorkspaceViewModel(repository?: WorkspaceRepository): Workspa
   const [status, setStatus] = useState<WorkspaceStatus>('loading')
   const [document, setDocument] = useState<WorkspaceDocument | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<string | null>(null)
+  const [pinMode, setPinModeState] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [feedback, setFeedback] = useState('正在准备你的工作台…')
 
@@ -55,7 +79,7 @@ export function useWorkspaceViewModel(repository?: WorkspaceRepository): Workspa
     let active = true
     void repositoryRef.current.load().then((loaded) => {
       if (!active) return
-      const nextDocument = loaded ?? createInitialDocument()
+      const nextDocument = loaded ? normalizeDocument(loaded) : createInitialDocument()
       setDocument(nextDocument)
       setStatus('ready')
       setFeedback(loaded ? '已恢复上次编辑状态' : '已创建示例工作台，可以直接拖动设备')

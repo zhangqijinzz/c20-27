@@ -12,12 +12,32 @@ export interface DeskItem {
   rotation: number
 }
 
+export type AnnotationColor = 'amber' | 'red' | 'blue' | 'green' | 'violet'
+
+/**
+ * 批注不是设备：它要么钉在画布坐标上（free），
+ * 要么挂在某件设备上（item），跟随设备移动。
+ */
+export interface PlanAnnotation {
+  id: string
+  text: string
+  color: AnnotationColor
+  resolved: boolean
+  anchor:
+    | { kind: 'free'; x: number; y: number }
+    | { kind: 'item'; itemId: string; dx: number; dy: number }
+  createdAt: string
+  updatedAt: string
+}
+
 export interface WorkspacePlan {
   id: string
   name: string
   deskWidthMm: number
   deskHeightMm: number
   items: DeskItem[]
+  /** 批注独立于设备存放，不参与任何布局计算 */
+  annotations: PlanAnnotation[]
   updatedAt: string
 }
 
@@ -25,6 +45,8 @@ export interface WorkspaceDocument {
   version: 1
   plans: WorkspacePlan[]
   activePlanId: string
+  /** 批注层的全局开关：关掉后画布只呈现设备，和普通查看完全一样 */
+  annotationsHidden: boolean
 }
 
 export interface ItemBounds {
@@ -63,6 +85,18 @@ export const DEVICE_DEFINITIONS: DeviceDefinition[] = [
 
 export const DEFAULT_DESK = { widthMm: 1600, heightMm: 800 }
 
+export const ANNOTATION_COLORS: { value: AnnotationColor; label: string; hex: string }[] = [
+  { value: 'amber', label: '黄色', hex: '#f5b53e' },
+  { value: 'red', label: '红色', hex: '#ef6a6a' },
+  { value: 'blue', label: '蓝色', hex: '#5b8def' },
+  { value: 'green', label: '绿色', hex: '#46a97c' },
+  { value: 'violet', label: '紫色', hex: '#9277e6' },
+]
+
+export function getAnnotationColor(color: AnnotationColor): { value: AnnotationColor; label: string; hex: string } {
+  return ANNOTATION_COLORS.find((entry) => entry.value === color) ?? ANNOTATION_COLORS[0]
+}
+
 export function getDeviceDefinition(type: DeviceType): DeviceDefinition {
   return DEVICE_DEFINITIONS.find((device) => device.type === type) ?? DEVICE_DEFINITIONS[0]
 }
@@ -70,6 +104,18 @@ export function getDeviceDefinition(type: DeviceType): DeviceDefinition {
 export function createId(prefix: string): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return `${prefix}-${crypto.randomUUID()}`
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+export type AnnotationAnchorInput =
+  | { kind: 'free'; x: number; y: number }
+  | { kind: 'item'; itemId: string; dx?: number; dy?: number }
+
+export function createAnnotation(text: string, anchorInput: AnnotationAnchorInput, color: AnnotationColor = 'amber'): PlanAnnotation {
+  const now = new Date().toISOString()
+  const anchor = anchorInput.kind === 'free'
+    ? { kind: 'free' as const, x: anchorInput.x, y: anchorInput.y }
+    : { kind: 'item' as const, itemId: anchorInput.itemId, dx: anchorInput.dx ?? 0, dy: anchorInput.dy ?? 0 }
+  return { id: createId('note'), text, color, resolved: false, anchor, createdAt: now, updatedAt: now }
 }
 
 export function createItem(type: DeviceType, index = 0): DeskItem {
@@ -102,11 +148,26 @@ export function createPlan(name = '我的工作台', withDemo = true): Workspace
     deskWidthMm: DEFAULT_DESK.widthMm,
     deskHeightMm: DEFAULT_DESK.heightMm,
     items,
+    annotations: [],
     updatedAt: new Date().toISOString(),
   }
 }
 
+/** 兼容旧数据：没有批注字段的历史方案补上空数组 */
+export function normalizePlan(plan: WorkspacePlan): WorkspacePlan {
+  return Array.isArray(plan.annotations) ? plan : { ...plan, annotations: [] }
+}
+
 export function createInitialDocument(): WorkspaceDocument {
   const plan = createPlan('我的工作台', true)
-  return { version: 1, plans: [plan], activePlanId: plan.id }
+  return { version: 1, plans: [plan], activePlanId: plan.id, annotationsHidden: false }
+}
+
+/** 兼容没有批注字段的旧文档 */
+export function normalizeDocument(document: WorkspaceDocument): WorkspaceDocument {
+  return {
+    ...document,
+    annotationsHidden: document.annotationsHidden ?? false,
+    plans: document.plans.map(normalizePlan),
+  }
 }
